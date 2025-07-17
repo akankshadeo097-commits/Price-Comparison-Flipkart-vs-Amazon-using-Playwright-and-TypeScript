@@ -1,25 +1,117 @@
-# Price-Comparison-Flipkart-vs-Amazon-using-Playwright-and-TypeScript
-Compare Product Price on Flipkart and Amazon using Playwright with 
-TypeScript 
-Objective: 
-Write an end-to-end test using Playwright and TypeScript that: 
-1. Navigate to Flipkart and Amazon  
-2. Validate url and title of the page 
-3. Searches for a given product name on both Flipkart and Amazon. 
-4. Validates that the product appears in the search results and pick the same product in 
-both the site 
-5. Extracts the price of the first matching product from both websites. 
-6. Compares the prices: 
-○ If the Flipkart price is less than the Amazon price, the test passes. 
-○ If not, the test fails with a message showing prices on both sites. 
-�
-�
- Product to Search: "iphone 15 plus" 
-✅
- Acceptance Criteria: 
-● Use Playwright with TypeScript 
-● Use parallel execution to open both websites and search simultaneously 
-● Extract price of the product being compared 
-● Add multiple assertion 
-● Print prices in console 
-● If the test fails, provide a cl
+{
+  "name": "price-comparator",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "npx playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.1",
+    "typescript": "^5.4.0"
+  }
+}
+
+2. tsconfig.json
+
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true
+  },
+  "include": ["tests"]
+}
+
+3. playwright.config.ts
+
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  use: {
+    headless: true,
+    viewport: { width: 1280, height: 720 },
+    ignoreHTTPSErrors: true,
+  },
+  timeout: 60000,
+});
+
+4. tests/comparePrices.spec.ts
+
+import { test, expect } from '@playwright/test';
+
+test('Compare price of iPhone 15 Plus on Flipkart and Amazon', async ({ browser }) => {
+  const flipkartCtx = await browser.newContext();
+  const amazonCtx = await browser.newContext();
+
+  const flipkartPage = await flipkartCtx.newPage();
+  const amazonPage = await amazonCtx.newPage();
+
+  const product = 'iphone 15 plus';
+  let flipkartPrice: number = 0;
+  let amazonPrice: number = 0;
+
+  await Promise.all([
+    (async () => {
+      await flipkartPage.goto('https://www.flipkart.com');
+      expect(flipkartPage.url()).toContain('flipkart');
+      expect(await flipkartPage.title()).toContain('Flipkart');
+
+      try {
+        await flipkartPage.locator('button:has-text("✕")').click({ timeout: 3000 });
+      } catch {}
+
+      await flipkartPage.locator('input[title="Search for products, brands and more"]').fill(product);
+      await flipkartPage.keyboard.press('Enter');
+      await flipkartPage.waitForTimeout(3000);
+
+      const firstResult = flipkartPage.locator('div._4rR01T').first();
+      await expect(firstResult).toContainText('iPhone');
+
+      const priceText = await flipkartPage.locator('div._30jeq3').first().innerText();
+      flipkartPrice = parseInt(priceText.replace(/[^0-9]/g, ''));
+      console.log(`Flipkart Price: ₹${flipkartPrice}`);
+    })(),
+
+    (async () => {
+      await amazonPage.goto('https://www.amazon.in');
+      expect(amazonPage.url()).toContain('amazon');
+      expect(await amazonPage.title()).toContain('Amazon');
+
+      await amazonPage.locator('input#twotabsearchtextbox').fill(product);
+      await amazonPage.keyboard.press('Enter');
+      await amazonPage.waitForTimeout(3000);
+
+      const firstResult = amazonPage.locator('span.a-size-medium').first();
+      await expect(firstResult).toContainText('iPhone');
+
+      const priceText = await amazonPage.locator('span.a-price-whole').first().innerText();
+      amazonPrice = parseInt(priceText.replace(/[^0-9]/g, ''));
+      console.log(`Amazon Price: ₹${amazonPrice}`);
+    })()
+  ]);
+
+  expect(flipkartPrice).toBeLessThan(amazonPrice);
+
+  console.log(`✅ Test Passed: Flipkart (₹${flipkartPrice}) < Amazon (₹${amazonPrice})`);
+});
+
+How to Run
+
+1. Install dependencies: `npm install`
+2. Install Playwright browsers: `npx playwright install`
+3. Run the test: `npx playwright test`
+
+Test Failure Example
+
+If Flipkart price is higher than Amazon, you’ll see:
+
+Error: expect(received).toBeLessThan(expected)
+Received: 84999
+Expected: < 79999
+
